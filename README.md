@@ -2,7 +2,7 @@
 
 A complete IoT telemetry service and bilingual operations dashboard built from the supplied CYP-1183 specification. The rebuild uses **JavaScript only** (Node.js and React JSX), **MySQL 8.4**, Redis, JWT authentication, Docker Compose, and a searchable inventory-first device registration flow.
 
-## Reviewer quick start
+## 1- how to run the project
 
 Requirements: Docker Desktop with Docker Compose.
 
@@ -18,23 +18,270 @@ Email: director.demo@cypod.local
 Password: DirectorDemo#2026
 ```
 
-The first startup automatically creates the demo account, provisions 300 inventory devices, registers `DEV-1001` through `DEV-1005`, and imports the supplied sample telemetry once. The dashboard therefore opens with useful data instead of an empty state. API health is available at `http://localhost:4000/health`.
+## 2- Sample-data audit
 
-Useful commands:
+The supplied file contains **529 rows**. With the documented policy, a clean first import produces:
+
+```json
+{
+  "total": 529,
+  "stored": 519,
+  "duplicates": 1,
+  "rejected": 9
+}
+```
+
+1. Invalid Battery Values
+
+What was found
+
+Two readings contained invalid battery percentages:
+
+{
+"battery": 127
+}
+
+{
+"battery": -5
+}
+
+A battery percentage must be between 0 and 100.
+
+Decision
+
+Both readings are rejected.
+
+API response
+
+HTTP 422 Unprocessable Entity
+
+{
+"success": false,
+"error": {
+"code": "INVALID_BATTERY",
+"message": "Battery must be between 0 and 100."
+}
+}
+
+2. Impossible Temperature Value
+
+What was found
+
+One reading contained:
+
+{
+"temperature": 850,
+"status": "FAULT"
+}
+
+Decision
+
+The reading is rejected.
+
+API response
+
+HTTP 422 Unprocessable Entity
+
+{
+"success": false,
+"error": {
+"code": "INVALID_TEMPERATURE",
+"message": "Temperature is outside the accepted range."
+}
+}
+
+3. Missing Device Status
+
+What was found
+
+One reading did not contain a status field.
+
+Decision
+
+The reading is rejected.
+
+API response
+
+HTTP 422 Unprocessable Entity
+
+{
+"success": false,
+"error": {
+"code": "INVALID_STATUS",
+"message": "Status is required."
+}
+}
+
+4. Missing GPS Coordinates
+
+What was found
+
+One reading contained:
+
+{
+"lat": null,
+"lng": null
+}
+
+Decision
+
+The reading is rejected.
+
+API response
+
+HTTP 422 Unprocessable Entity
+
+{
+"success": false,
+"error": {
+"code": "INVALID_GPS",
+"message": "Valid latitude and longitude are required."
+}
+}
+
+5. Unknown Device
+
+What was found
+
+Four readings were sent for:
+
+DEV-9999
+
+This device is not registered.
+
+Decision
+
+All four readings are rejected.
+
+6. Battery Supplied as a String
+
+What was found
+
+One reading contained:
+
+{
+"battery": "88"
+}
+
+The value is a string instead of a number.
+
+Decision
+
+The reading is accepted after safe normalization.
+
+The stored value is:
+
+{
+"battery": 88
+}
+
+7. Exact Duplicate Reading
+
+What was found
+
+One event was repeated with exactly the same data.
+
+Decision
+
+The repeated request is accepted idempotently, but a second database row is not inserted.
+
+A suitable response is:
+
+HTTP 200 OK
+
+{
+"success": true,
+"duplicate": true,
+"message": "Telemetry event was already processed."
+}
+
+8. Client-Supplied received_at
+
+What was found
+
+Many records contained a client-provided received_at field.
+
+Decision
+
+The telemetry reading is accepted, but the supplied value is discarded.
+
+The server creates its own receipt time:
+
+const receivedAt = new Date();
+
+9. Delayed and Out-of-Order Readings
+
+What was found
+
+Several events arrived in a different order from the order in which they were originally recorded.
+
+For example:
+
+10:05 reading received first
+10:01 reading received later
+
+Decision
+
+Valid delayed readings are accepted and stored as historical telemetry.
+
+However, an older reading does not replace a newer latest state.
+
+Example
+
+Assume the cache currently contains:
+
+{
+"timestamp": "2026-07-21T10:05:00Z",
+"battery": 70
+}
+
+A buffered reading then arrives:
+
+{
+"timestamp": "2026-07-21T10:01:00Z",
+"battery": 74
+}
+
+The older reading is stored in the database history, but the cache remains unchanged because 10:01 is older than 10:05.
+
+## 3- Rate Limiting and Offline Buffering
+
+Live telemetry uses POST /devices/:id/telemetry and is limited to 10 requests per minute per device. The 11th request returns HTTP 429, which helps protect the API from faulty or compromised devices.
+
+Buffered readings use POST /devices/:id/telemetry/batch, with a maximum of 500 readings per batch. To count as backfill, every reading must be at least two minutes old. Batch requests also have their own limit of two per minute per device.
+
+## 4- Caching
+
+The latest telemetry is cached in Redis for 30 seconds. This keeps dashboard reads fast while limiting how long stale data can remain if the cache is not refreshed.
+
+Whenever a new telemetry event becomes the latest reading, the Redis value is updated immediately, so the system does not wait for the TTL to expire.
+
+The project uses the cache-aside pattern: reads check Redis first, then fall back to MySQL on a cache miss and repopulate the cache.
+
+## 5- Indexes and scaling
+
+The telemetry index on (device_id, recorded_at, id) helps quickly fetch the latest reading and device history. The catalog index improves filtering devices by owner, status, site, and model. Other indexes enforce uniqueness for emails, serial numbers, assignments, and duplicate telemetry.
+
+At 50 million telemetry rows per day, I would keep users, devices, permissions, and alerts in MySQL, but move telemetry to a scalable pipeline using Kafka or Kinesis, object storage, and a time-series or columnar database such as ClickHouse or TimescaleDB. Redis would continue serving the latest device state quickly.
+
+## 6- The three regression tests
+
+Only three tests were selected deliberately:
+
+1. **Dirty sample policy** — asserts the real file remains `519 stored / 1 duplicate / 9 rejected`, including exact rejection categories. This catches accidental validation or deduplication drift.
+2. **Live-rate/backfill reconciliation** — proves the eleventh live reading is blocked while an old buffered reading remains backfill-eligible. This protects the most ambiguous requirement in the task.
+3. **Cache HIT/MISS path** — proves the first latest-state request reads the database and populates the cache, while the next request is a HIT without another database query.
+
+Run them with:
 
 ```bash
-# Run the three tests
 docker compose exec api npm test
-
-# Re-run the sample importer (idempotent; existing readings become duplicates)
-docker compose exec api node src/scripts/importSample.js /app/sample_telemetry.json
-
-# Stop the stack
-docker compose down
-
-# Full database/cache reset
-docker compose down -v
 ```
+
+## 7- What I did not get to, and what I would do next
+
+This submission does not include refresh tokens, email verification, per-device cryptographic credentials, WebSocket/SSE push, alert acknowledgement workflows, inventory CSV upload, audit logs, or observability dashboards. Next I would add device-scoped API keys or mutual TLS, a message queue between ingestion and persistence, cursor-based history pagination, Prometheus/OpenTelemetry instrumentation, structured audit events, browser end-to-end tests, and a real external inventory synchronization job. I would also separate migrations from container startup and manage them with a dedicated migration tool.
+
 
 ## Architecture
 
@@ -52,166 +299,6 @@ MySQL 8.4                    Redis 7
 
 MySQL stores users, inventory, registered devices, telemetry, and alert state. Redis stores `latest:<deviceId>` values with a 30-second TTL and rate-limit counters. Nginx serves the React build and proxies `/api` to Express.
 
-## Device registration for a large inventory
-
-The **Add devices** action does not ask an operator to type an arbitrary device ID. It opens a searchable inventory picker backed by `GET /device-catalog`.
-
-The operator can:
-
-- search by device ID, display name, serial number, model, or site;
-- filter by site, model, connectivity, and lifecycle status;
-- browse server-side paginated results;
-- select devices across pages, rename them, and add up to 20 in one operation.
-
-Search is debounced in the React client and executed in MySQL, so the browser never has to download the entire inventory. The inventory query is scoped to the authenticated user and uses parameterized values. Assigning a device uses a transaction and `SELECT ... FOR UPDATE`, which prevents two requests from claiming the same hardware.
-
-For interview convenience, a new account receives a generated demonstration inventory. In a production system this table would be synchronized from an ERP, asset-management platform, manufacturing registry, or IoT provisioning service instead.
-
-## API
-
-### Public
-
-- `POST /auth/register`
-- `POST /auth/login`
-- `GET /health`
-
-### Authenticated
-
-- `GET /device-catalog?search=&site=&model=&connectivity=&status=&page=&limit=`
-- `POST /devices`
-- `POST /devices/bulk` — additional convenience endpoint
-- `GET /devices`
-- `POST /devices/:id/telemetry`
-- `POST /devices/:id/telemetry/batch` — buffered/offline readings
-- `GET /devices/:id/latest`
-- `GET /devices/:id/history?from=&to=&page=&limit=`
-- `GET /alerts`
-
-Every protected route verifies the JWT and rejects expired or malformed tokens. Device access is checked against the logged-in owner.
-
-## Telemetry ingestion and validation
-
-A live payload is:
-
-```json
-{
-  "battery": 82.5,
-  "temperature": 31.2,
-  "lat": 30.0444,
-  "lng": 31.2357,
-  "status": "OK",
-  "timestamp": "2026-07-10T10:00:00Z"
-}
-```
-
-Validation occurs before any database write:
-
-- battery: numeric, `0..100`;
-- temperature: numeric, `-50..100` as a physical sanity boundary;
-- latitude and longitude: both required and within geographic bounds;
-- status: `OK`, `WARN`, `FAULT`, or `OFFLINE`;
-- timestamp: valid ISO timestamp and no more than five minutes ahead of the server.
-
-Numeric strings such as `"88"` are normalized to numbers because JSON generated by older firmware commonly serializes sensor numbers as strings. Unknown fields are not persisted. In particular, client-provided `received_at` is ignored; MySQL records trusted server receipt time.
-
-A SHA-256 fingerprint over the normalized reading makes retries idempotent. A duplicate returns HTTP 200 with `duplicate: true` rather than creating another row.
-
-## Sample-data audit
-
-The supplied file contains **529 rows**. With the documented policy, a clean first import produces:
-
-```json
-{
-  "total": 529,
-  "stored": 519,
-  "duplicates": 1,
-  "rejected": 9
-}
-```
-
-Findings and decisions:
-
-| Case found | Count | Decision |
-|---|---:|---|
-| Battery `127` or `-5` | 2 | Reject with HTTP 422 and `INVALID_BATTERY`. Values outside a percentage range are not clamped because silent correction hides device faults. |
-| Temperature `850` | 1 | Reject with HTTP 422 and `INVALID_TEMPERATURE`. `FAULT` status does not make an impossible physical value safe to store as normal telemetry. |
-| Missing `status` | 1 | Reject with HTTP 422 and `INVALID_STATUS`; the API does not invent operational state. |
-| `lat` and `lng` are both `null` | 1 | Reject with HTTP 422 and `INVALID_GPS` because this version treats GPS as required by the payload contract. A later schema could explicitly support stationary non-GPS devices. |
-| Unknown `DEV-9999` | 4 | Reject as an unknown/unowned device. Telemetry never auto-creates hardware. |
-| Battery string `"88"` | 1 | Accept after safe numeric normalization and store `88`. |
-| Exact repeated event | 1 | Accept idempotently but do not insert again; report it as a duplicate. |
-| Client `received_at` fields | many | Accept the reading, discard the client value, and store server receipt time. |
-| Out-of-order and delayed timestamps | many | Accept as historical telemetry. They do not replace a newer latest state or reopen alerts. |
-
-The importer intentionally passes every row through the same normalization and storage policy used by the API.
-
-## Reconciling rate limiting and offline buffering
-
-Live traffic uses `POST /devices/:id/telemetry` and a Redis fixed-window counter keyed by device and server minute. The eleventh live request in a minute returns HTTP 429. This protects the service from a malfunctioning or compromised device.
-
-Buffered traffic uses `POST /devices/:id/telemetry/batch` with up to 500 readings. A batch is accepted only when every timestamp is at least two minutes old, which stops a sender from labeling current flood traffic as backfill. Backfill has a separate limit of two batch requests per minute per device. The historic readings are therefore not discarded merely because they arrive together, while request size, authentication, ownership, validation, deduplication, and a separate ingress quota still protect the API.
-
-This separation is the key reconciliation: **10 current readings per minute remains strict, while verified historical readings use a controlled batch lane.**
-
-## Latest state, cache, and alerts
-
-The read strategy is **cache-aside**:
-
-1. `GET /devices/:id/latest` checks Redis.
-2. A warm key returns `HIT` and is logged as `[CACHE] HIT device=...`.
-3. A missing or corrupt key logs `MISS`, reads MySQL, and repopulates Redis.
-
-The TTL is **30 seconds**. The dashboard polls every five seconds, so a warm entry can serve several polls while remaining short-lived enough to self-heal after an unexpected cache inconsistency.
-
-Writes behave like write-through for the latest value: after a successful telemetry transaction, the newest state is placed in Redis immediately. The code never waits for TTL expiry.
-
-`devices.latest_recorded_at` and `latest_telemetry_id` are updated only when the new event is actually newer. Delayed backfill is stored in history but cannot overwrite the current cache. Active alerts are synchronized only from that newest state:
-
-- battery below 15%;
-- temperature above the single `TEMP_CEILING_TLM7` constant;
-- `FAULT` status.
-
-## Security and API behavior
-
-- bcrypt cost 12 password hashes;
-- password hashes are never selected into responses;
-- verified, expiring JWTs;
-- Helmet security headers;
-- ownership checks on inventory, device, telemetry, history, latest state, and alerts;
-- input validation on every write endpoint;
-- parameterized MySQL queries only;
-- consistent `{ "error": { "code", "message" } }` responses;
-- no stack traces, SQL text, or internal exception messages returned;
-- English and Arabic endpoint messages selected from `Accept-Language`, with English fallback.
-
-The React UI also stores all visible interface text in English and Arabic translation files. Selecting Arabic sets `dir="rtl"` on the root document and flips the layout, drawer direction, alignment, and controls.
-
-## Deliberate indexes
-
-`idx_telemetry_device_recorded (device_id, recorded_at DESC, id DESC)` directly supports latest-state fallback reads and time-ordered history pagination for one device.
-
-`idx_catalog_owner_status (inventory_user_id, lifecycle_status, site, model)` supports the large-inventory picker by narrowing results to one account and common filters before applying text search.
-
-Additional indexes protect uniqueness of user email, inventory serial number, device assignment, and telemetry fingerprint.
-
-## If telemetry reached 50 million rows per day
-
-I would keep users, device ownership, inventory, permissions, alert configuration, and current alert state in relational SQL because those entities need constraints and transactions. Telemetry would move to a purpose-built high-volume path: a durable broker such as Kafka or Kinesis, object storage for immutable raw events, and a partitioned time-series/columnar store such as ClickHouse, TimescaleDB, BigQuery, or an equivalent managed service. Data would be partitioned by time and device hash, compressed, retained by tier, and summarized into minute/hour aggregates. The API would read current state from Redis or a compact latest-state table and query raw telemetry asynchronously. MySQL would retain references and relational metadata rather than 50 million daily event rows.
-
-## The three regression tests
-
-Only three tests were selected deliberately:
-
-1. **Dirty sample policy** — asserts the real file remains `519 stored / 1 duplicate / 9 rejected`, including exact rejection categories. This catches accidental validation or deduplication drift.
-2. **Live-rate/backfill reconciliation** — proves the eleventh live reading is blocked while an old buffered reading remains backfill-eligible. This protects the most ambiguous requirement in the task.
-3. **Cache HIT/MISS path** — proves the first latest-state request reads the database and populates the cache, while the next request is a HIT without another database query.
-
-Run them with:
-
-```bash
-docker compose exec api npm test
-```
-
 ## Project structure
 
 ```text
@@ -223,9 +310,5 @@ sample_telemetry.json
 ```
 
 All JavaScript/JSX source files begin with the required `// cypod-telemetry` marker. Deliberate task-only trade-offs include `// note:` comments. Commit subjects are prefixed with `[CYP-1183]`.
-
-## What I did not get to, and what I would do next
-
-This submission does not include refresh tokens, email verification, per-device cryptographic credentials, WebSocket/SSE push, alert acknowledgement workflows, inventory CSV upload, audit logs, or observability dashboards. Next I would add device-scoped API keys or mutual TLS, a message queue between ingestion and persistence, cursor-based history pagination, Prometheus/OpenTelemetry instrumentation, structured audit events, browser end-to-end tests, and a real external inventory synchronization job. I would also separate migrations from container startup and manage them with a dedicated migration tool.
 
 generated against spec CYP-1183 · build TLM-7Q2
