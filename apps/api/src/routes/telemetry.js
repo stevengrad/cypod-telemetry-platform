@@ -6,17 +6,34 @@ import { t } from '../i18n/messages.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireOwnedDevice } from '../services/deviceAccess.js';
 import { enforceBackfillRateLimit, enforceLiveRateLimit, isBackfillTimestamp } from '../services/rateLimiter.js';
-import { getLatestTelemetry, storeTelemetry } from '../services/telemetryService.js';
+import {
+  getLatestTelemetry,
+  storeTelemetry,
+  updateTelemetry,
+} from '../services/telemetryService.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { historyQuerySchema, validateTelemetryPayload } from '../validation/schemas.js';
+import {
+  deriveTelemetryStatus,
+} from '../services/telemetryPolicy.js';
 
 export const telemetryRouter = Router();
 telemetryRouter.use(requireAuth);
 
 telemetryRouter.post('/:id/telemetry', asyncHandler(async (req, res) => {
   await requireOwnedDevice(req.user.id, req.params.id);
-  const input = validateTelemetryPayload(req.body);
+ const validatedInput =
+  validateTelemetryPayload(req.body);
+
+const input = req.body?.manual === true
+  ? {
+      ...validatedInput,
+      status: deriveTelemetryStatus(
+        validatedInput,
+      ),
+    }
+  : validatedInput;
   if (req.header('x-telemetry-backfill') === 'true') {
     throw new ApiError(400, 'USE_BACKFILL_BATCH', 'backfillRequired');
   }
@@ -61,6 +78,50 @@ telemetryRouter.get('/:id/latest', asyncHandler(async (req, res) => {
   const result = await getLatestTelemetry(req.params.id);
   res.json(result);
 }));
+
+telemetryRouter.put(
+  '/:id/telemetry/:telemetryId',
+  asyncHandler(async (req, res) => {
+    await requireOwnedDevice(
+      req.user.id,
+      req.params.id,
+    );
+
+    const telemetryId = Number(
+      req.params.telemetryId,
+    );
+
+    if (
+      !Number.isSafeInteger(telemetryId) ||
+      telemetryId <= 0
+    ) {
+      throw new ApiError(
+        422,
+        'INVALID_TELEMETRY_ID',
+        'payloadInvalid',
+      );
+    }
+
+    const input = validateTelemetryPayload(
+      req.body,
+    );
+
+    const result = await updateTelemetry(
+      req.params.id,
+      telemetryId,
+      input,
+    );
+
+    res.json({
+      message: t(
+        req.locale,
+        'telemetryUpdated',
+      ),
+      telemetry: result.telemetry,
+      latest: result.latest,
+    });
+  }),
+);
 
 telemetryRouter.get('/:id/history', asyncHandler(async (req, res) => {
   await requireOwnedDevice(req.user.id, req.params.id);

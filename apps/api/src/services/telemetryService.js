@@ -3,7 +3,11 @@ import { createHash } from 'node:crypto';
 import { redis } from '../cache/redis.js';
 import { config } from '../config/index.js';
 import { db, withTransaction } from '../db/mysql.js';
-import { deriveAlertConditions } from './telemetryPolicy.js';
+import {
+  deriveAlertConditions,
+  deriveTelemetryStatus,
+} from './telemetryPolicy.js';
+import { ApiError } from '../utils/ApiError.js';
 
 function fingerprint(input) {
   const canonical = JSON.stringify({
@@ -113,6 +117,159 @@ export async function storeTelemetry(deviceId, input, trafficClass = 'LIVE') {
   if (outcome.latest && (outcome.becameLatest || outcome.duplicate)) {
     await redis.set(key, JSON.stringify(outcome.latest), { EX: config.CACHE_TTL_SECONDS });
   }
+  return outcome;
+}
+
+// cypod-telemetry
+export async function updateTelemetry(
+  deviceId,
+  telemetryId,
+  input,
+) {
+  const normalizedInput = {
+  ...input,
+  status: deriveTelemetryStatus(input),
+};
+  const cacheKey = `latest:${deviceId}`;
+
+  let outcome;
+
+  try {
+    outcome = await withTransaction(async (connection) => {
+      const [existingRows] = await connection.query(
+        `SELECT id
+           FROM telemetry_events
+          WHERE id = ?
+            AND device_id = ?
+          LIMIT 1
+          FOR UPDATE`,
+        [telemetryId, deviceId],
+      );
+
+      if (!existingRows[0]) {
+        throw new ApiError(
+          404,
+          'TELEMETRY_NOT_FOUND',
+          'telemetryNotFound',
+        );
+      }
+
+      const hash = fingerprint(normalizedInput)
+
+      const [duplicateRows] = await connection.query(
+        `SELECT id
+           FROM telemetry_events
+          WHERE device_id = ?
+            AND fingerprint = ?
+            AND id <> ?
+          LIMIT 1`,
+        [deviceId, hash, telemetryId],
+      );
+
+      if (duplicateRows[0]) {
+        throw new ApiError(
+          409,
+          'DUPLICATE_TELEMETRY',
+          'duplicateTelemetry',
+        );
+      }
+
+      const recordedAt = normalizedInput.timestamp
+        .slice(0, 23)
+        .replace('T', ' ');
+
+      await connection.query(
+        `UPDATE telemetry_events
+            SET battery = ?,
+                temperature = ?,
+                lat = ?,
+                lng = ?,
+                status = ?,
+                recorded_at = ?,
+                fingerprint = ?
+          WHERE id = ?
+            AND device_id = ?`,
+        [
+         normalizedInput.battery,
+         normalizedInput.temperature,
+         normalizedInput.lat,
+         normalizedInput.lng,
+         normalizedInput.status,
+          recordedAt,
+          hash,
+          telemetryId,
+          deviceId,
+        ],
+      );
+
+      /*
+       * Editing a timestamp can change which reading is the latest,
+       * so query the latest reading again instead of assuming that
+       * the edited reading is still latest.
+       */
+      const latest = await queryLatest(connection, deviceId);
+
+      await connection.query(
+        `UPDATE devices
+            SET latest_telemetry_id = ?,
+                latest_recorded_at = ?
+          WHERE id = ?`,
+        [
+          latest.id,
+          latest.timestamp.slice(0, 23).replace('T', ' '),
+          deviceId,
+        ],
+      );
+
+      await synchronizeAlerts(connection, latest);
+
+      const [updatedRows] = await connection.query(
+        `SELECT id,
+                device_id AS deviceId,
+                battery,
+                temperature,
+                lat,
+                lng,
+                status,
+                recorded_at AS recordedAt,
+                received_at AS receivedAt,
+                traffic_class AS trafficClass
+           FROM telemetry_events
+          WHERE id = ?
+            AND device_id = ?
+          LIMIT 1`,
+        [telemetryId, deviceId],
+      );
+
+      return {
+        telemetry: mapTelemetry(updatedRows[0]),
+        latest,
+      };
+    });
+  } catch (error) {
+    if (error?.code === 'ER_DUP_ENTRY') {
+      throw new ApiError(
+        409,
+        'DUPLICATE_TELEMETRY',
+        'duplicateTelemetry',
+      );
+    }
+
+    throw error;
+  }
+
+  /*
+   * The latest value is updated immediately.
+   * We do not wait for the old Redis TTL to expire.
+   */
+  await redis.set(
+    cacheKey,
+    JSON.stringify(outcome.latest),
+    {
+      EX: config.CACHE_TTL_SECONDS,
+    },
+  );
+
   return outcome;
 }
 

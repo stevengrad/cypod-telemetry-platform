@@ -192,3 +192,120 @@ input:disabled { color: var(--muted); }
 [dir="rtl"] .inventory-filters select, [dir="rtl"] .fleet-toolbar select { padding: 0 10px 0 28px; }
 @media (max-width: 850px) { .inventory-grid { grid-template-columns: 1fr; }.inventory-filters { grid-template-columns: 1fr 1fr; }.filter-label { grid-column: 1/-1; }.inventory-body { max-height: 42vh; } }
 @media (max-width: 560px) { .inventory-modal { width: 100%; max-height: 95vh; }.inventory-filters { grid-template-columns: 1fr; }.fleet-toolbar { flex-direction: column; }.inventory-status { display: none; }.inventory-item { grid-template-columns: auto auto minmax(0,1fr); }.selected-devices label { grid-template-columns: 80px minmax(0,1fr) auto; } }
+/* Telemetry editing */
+
+.telemetry-edit-backdrop {
+  z-index: 80;
+}
+
+.telemetry-edit-modal {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.telemetry-edit-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.telemetry-edit-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.telemetry-edit-form label > span {
+  color: #91a5b9;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.telemetry-edit-form input,
+.telemetry-edit-form select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  outline: none;
+  color: #dce7f2;
+  background: #091522;
+}
+
+.telemetry-edit-form input:focus,
+.telemetry-edit-form select:focus {
+  border-color: rgba(119, 105, 246, 0.85);
+  box-shadow:
+    0 0 0 3px
+    rgba(119, 105, 246, 0.12);
+}
+
+.telemetry-edit-form .full-width {
+  grid-column: 1 / -1;
+}
+
+.telemetry-edit-form footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 5px;
+}
+
+.edit-telemetry-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(119, 105, 246, 0.18);
+  border-radius: 9px;
+  color: #8296aa;
+  background: rgba(119, 105, 246, 0.06);
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.history-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-reading-button {
+  padding: 3px 7px;
+  border: 1px solid rgba(119, 105, 246, 0.28);
+  border-radius: 6px;
+  color: #aaa2ff;
+  background: rgba(119, 105, 246, 0.08);
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.edit-reading-button:hover {
+  color: white;
+  border-color: rgba(119, 105, 246, 0.7);
+  background: rgba(119, 105, 246, 0.2);
+}
+
+@media (max-width: 560px) {
+  .telemetry-edit-form {
+    grid-template-columns: 1fr;
+  }
+
+  .telemetry-edit-form .full-width {
+    grid-column: auto;
+  }
+}
+.history-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.add-reading-button {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 9px;
+}
+
+.add-reading-button svg {
+  width: 14px;
+  height: 14px;
+}

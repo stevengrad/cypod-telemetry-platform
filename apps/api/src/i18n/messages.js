@@ -16,7 +16,15 @@ const messages = {
     timestampInvalid: 'Timestamp must be a valid ISO date and cannot be too far in the future.', payloadInvalid: 'The telemetry payload is invalid.',
     invalidDateRange: 'The from date must be before the to date.', internalError: 'The request could not be completed.',
     alertLowBattery: 'Battery is below the safe threshold.', alertHighTemperature: 'Temperature is above the configured ceiling.',
-    alertDeviceFault: 'The device reported a fault state.', inventoryProvisioned: 'Demo inventory was prepared for this account.'
+    alertDeviceFault: 'The device reported a fault state.', inventoryProvisioned: 'Demo inventory was prepared for this account.',
+    telemetryUpdated:
+  'Telemetry reading updated successfully.',
+
+telemetryNotFound:
+  'The requested telemetry reading was not found.',
+
+duplicateTelemetry:
+  'Another identical telemetry reading already exists.',
   },
   ar: {
     healthOk: 'الخدمة تعمل بصورة سليمة.', registered: 'تم إنشاء الحساب بنجاح.', loggedIn: 'تم تسجيل الدخول بنجاح.',
@@ -34,7 +42,15 @@ const messages = {
     timestampInvalid: 'يجب أن يكون الوقت بصيغة ISO صحيحة وألا يكون متقدمًا كثيرًا.', payloadInvalid: 'بيانات القياس غير صالحة.',
     invalidDateRange: 'يجب أن يكون تاريخ البداية قبل تاريخ النهاية.', internalError: 'تعذر إكمال الطلب.',
     alertLowBattery: 'مستوى البطارية أقل من الحد الآمن.', alertHighTemperature: 'درجة الحرارة أعلى من الحد المحدد.',
-    alertDeviceFault: 'أبلغ الجهاز عن حالة عطل.', inventoryProvisioned: 'تم تجهيز مخزون تجريبي لهذا الحساب.'
+    alertDeviceFault: 'أبلغ الجهاز عن حالة عطل.', inventoryProvisioned: 'تم تجهيز مخزون تجريبي لهذا الحساب.',
+    telemetryUpdated:
+  'تم تعديل قراءة الجهاز بنجاح.',
+
+telemetryNotFound:
+  'قراءة الجهاز المطلوبة غير موجودة.',
+
+duplicateTelemetry:
+  'توجد قراءة أخرى مطابقة لهذه القراءة بالفعل.',
   },
 };
 

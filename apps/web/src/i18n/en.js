@@ -23,5 +23,18 @@ export const en = {
   inventoryEmpty: 'No inventory devices match these filters.', inventoryLoading: 'Searching inventory…', selected: 'selected', selectDevice: 'Select device', deselectDevice: 'Deselect device',
   customName: 'Display name', customNameHelp: 'You can edit the name before adding the device.', addSelected: 'Add selected devices', cancel: 'Cancel', previous: 'Previous', next: 'Next',
   page: 'Page', of: 'of', serial: 'Serial', firmware: 'Firmware', deviceAdded: 'Device added successfully.', devicesAdded: 'Devices added successfully.',
-  inventoryCount: 'inventory matches', maxSelection: 'You can add up to 20 devices at once.',
+  inventoryCount: 'inventory matches', maxSelection: 'You can add up to 20 devices at once.',edit: 'Edit',
+editTelemetryTitle: 'Edit telemetry reading',
+editTelemetryNote:
+  'Saving this change recalculates the latest device state, cache, and alerts.',
+saveChanges: 'Save changes',
+saving: 'Saving…',
+latitude: 'Latitude',
+longitude: 'Longitude',
+telemetryUpdated:
+  'Telemetry updated successfully.',
+  addReading: 'Add reading',
+addTelemetryTitle: 'Add telemetry reading',
+statusCalculatedAutomatically:
+  'Status is calculated automatically: high temperature becomes Fault, low battery becomes Warning, otherwise the device is OK.',
 };

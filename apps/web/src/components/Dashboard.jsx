@@ -29,5 +29,18 @@ export function Dashboard({ token, user, language, t, onLanguageChange, onLogout
         <div className="fleet-toolbar"><label><SearchIcon/><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchFleet}/></label><select value={healthFilter} onChange={(e) => setHealthFilter(e.target.value)}><option value="all">{t.allStatuses}</option><option value="healthy">{t.healthy}</option><option value="attention">{t.attention}</option><option value="critical">{t.critical}</option><option value="unknown">{t.unknown}</option></select></div>
         {loading ? <div className="panel-state">{t.loading}</div> : filteredDevices.length === 0 ? <div className="panel-state">{t.noDevices}</div> : <div className="device-table-wrap"><table className="device-table"><thead><tr><th>{t.device}</th><th>{t.status}</th><th>{t.battery}</th><th>{t.temperature}</th><th>{t.lastReading}</th></tr></thead><tbody>{filteredDevices.map((device) => { const health = healthClass(device); const latest = device.latest; return <tr key={device.id} onClick={() => setSelectedDevice(device)} tabIndex="0" onKeyDown={(event) => { if (event.key === 'Enter') setSelectedDevice(device); }}><td><div className="device-cell"><span className={`device-symbol ${health}`}><DeviceIcon/></span><div><strong>{device.name}</strong><small>{device.id} · {device.site}</small></div></div></td><td>{latest ? <span className={`status-pill status-${latest.status.toLowerCase()}`}><i/>{statusLabel(latest.status,t)}</span> : <span className="status-pill status-unknown"><i/>{t.unknown}</span>}</td><td>{latest ? <div className="battery-cell"><span>{latest.battery}%</span><div><i style={{ width: `${Math.max(0,Math.min(100,latest.battery))}%` }}/></div></div> : '—'}</td><td>{latest ? <span className="temperature-cell"><TemperatureIcon/>{latest.temperature}°C</span> : '—'}</td><td>{latest ? <span className="time-cell">{formatDate(latest.timestamp,language)}</span> : t.noReadings}</td></tr>; })}</tbody></table></div>}
       </article><article className="panel alerts-panel"><div className="section-heading"><div><h2>{t.alerts}</h2><p>{t.alertsSubtitle}</p></div><span className={`count-chip ${alerts.length ? 'danger' : ''}`}>{alerts.length}</span></div>{alerts.length === 0 ? <div className="empty-alerts"><span><ActivityIcon/></span><strong>{t.healthy}</strong><p>{t.noAlerts}</p></div> : <div className="alert-list">{alerts.map((alert) => <article key={alert.id}><span className="alert-symbol"><AlertIcon/></span><div><strong>{alert.deviceName}</strong><p>{alert.message}</p><small>{formatDate(alert.triggeredAt,language)}</small></div>{alert.observedValue !== null && <b>{alert.observedValue}</b>}</article>)}</div>}</article></section>
-    </section>{selectedDevice && <DeviceDrawer device={selectedDevice} token={token} language={language} t={t} onClose={() => setSelectedDevice(null)}/>} {showAddDevice && <AddDeviceModal token={token} language={language} t={t} onClose={() => setShowAddDevice(false)} onCreated={() => loadDashboard()}/>}</main>;
+    </section>{selectedDevice && (
+  <DeviceDrawer
+    device={selectedDevice}
+    token={token}
+    language={language}
+    t={t}
+    onClose={() =>
+      setSelectedDevice(null)
+    }
+    onUpdated={() =>
+      loadDashboard(true)
+    }
+  />
+)}</main>;
 }

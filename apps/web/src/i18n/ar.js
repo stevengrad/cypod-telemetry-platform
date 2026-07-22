@@ -23,5 +23,18 @@ export const ar = {
   inventoryEmpty: 'لا توجد أجهزة تطابق الفلاتر.', inventoryLoading: 'جارٍ البحث في المخزون…', selected: 'محدد', selectDevice: 'تحديد الجهاز', deselectDevice: 'إلغاء تحديد الجهاز',
   customName: 'اسم العرض', customNameHelp: 'يمكنك تعديل الاسم قبل إضافة الجهاز.', addSelected: 'إضافة الأجهزة المحددة', cancel: 'إلغاء', previous: 'السابق', next: 'التالي',
   page: 'صفحة', of: 'من', serial: 'الرقم التسلسلي', firmware: 'البرمجيات', deviceAdded: 'تمت إضافة الجهاز بنجاح.', devicesAdded: 'تمت إضافة الأجهزة بنجاح.',
-  inventoryCount: 'جهاز مطابق', maxSelection: 'يمكنك إضافة حتى 20 جهازًا في المرة الواحدة.',
+  inventoryCount: 'جهاز مطابق', maxSelection: 'يمكنك إضافة حتى 20 جهازًا في المرة الواحدة.',edit: 'تعديل',
+editTelemetryTitle: 'تعديل قراءة الجهاز',
+editTelemetryNote:
+  'سيؤدي حفظ التعديل إلى إعادة حساب أحدث حالة للجهاز والتخزين المؤقت والتنبيهات.',
+saveChanges: 'حفظ التعديلات',
+saving: 'جارٍ الحفظ…',
+latitude: 'خط العرض',
+longitude: 'خط الطول',
+telemetryUpdated:
+  'تم تعديل قراءة الجهاز بنجاح.',
+  addReading: 'إضافة قراءة',
+addTelemetryTitle: 'إضافة قراءة للجهاز',
+statusCalculatedAutomatically:
+  'يتم حساب الحالة تلقائيًا: ارتفاع الحرارة يجعل الحالة عطل، وانخفاض البطارية يجعلها تحذير، وبخلاف ذلك تكون الحالة سليمة.',
 };
