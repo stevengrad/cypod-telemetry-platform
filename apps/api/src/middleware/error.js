@@ -13,7 +13,7 @@ export function errorHandler(error, req, res, _next) {
       error: {
         code: 'VALIDATION_ERROR',
         message: t(req.locale, 'validationFailed'),
-        fields: error.issues.map((issue) => ({ field: issue.path.join('.'), message: t(req.locale, issue.message) })),
+        fields: error.issues.map((issue) => ({ field: issue.path.join('.'), message: t(req.locale, 'validationFailed') })),
       },
     });
   }

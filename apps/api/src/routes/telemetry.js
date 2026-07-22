@@ -48,6 +48,7 @@ telemetryRouter.post('/:id/telemetry/batch', asyncHandler(async (req, res) => {
       if (result.duplicate) summary.duplicates += 1;
       else summary.stored += 1;
     } catch (error) {
+      if (!(error instanceof ApiError)) throw error;
       summary.rejected += 1;
       summary.errors.push({ index, code: error.code || 'VALIDATION_ERROR', message: t(req.locale, error.messageKey || 'payloadInvalid') });
     }

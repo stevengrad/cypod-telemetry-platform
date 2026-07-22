@@ -12,8 +12,12 @@ export function isBackfillTimestamp(timestamp, now = Date.now()) {
 }
 
 async function consume(key, limit, ttlSeconds = 120) {
-  const value = await redis.incr(key);
-  if (value === 1) await redis.expire(key, ttlSeconds);
+  const script = `
+    local value = redis.call('INCR', KEYS[1])
+    if value == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+    return value
+  `;
+  const value = Number(await redis.eval(script, { keys: [key], arguments: [String(ttlSeconds)] }));
   return { allowed: value <= limit, count: value, limit };
 }
 

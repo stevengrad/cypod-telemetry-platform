@@ -42,7 +42,7 @@ export async function importSampleFile(filePath = config.SAMPLE_FILE_PATH, { ski
        JOIN devices d ON d.id = te.device_id WHERE d.owner_id = ?`,
       [demoUser.id],
     );
-    if (Number(countRow.count) > 0) return { skipped: true, reason: 'already populated' };
+    if (Number(countRow.count) >= 519) return { skipped: true, reason: 'already populated' };
   }
 
   const rows = JSON.parse(await readFile(filePath, 'utf8'));
