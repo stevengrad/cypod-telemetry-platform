@@ -4,7 +4,6 @@ import { apiRequest } from '../api.js';
 import { AddDeviceModal } from './AddDeviceModal.jsx';
 import { DeviceDrawer } from './DeviceDrawer.jsx';
 import { ActivityIcon, AlertIcon, BatteryIcon, DeviceIcon, LogoutIcon, PlusIcon, RefreshIcon, SearchIcon, TemperatureIcon } from './Icons.jsx';
-
 function formatDate(value, language) { return new Intl.DateTimeFormat(language === 'ar' ? 'ar-EG' : 'en-GB', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)); }
 function statusLabel(status, t) { return ({ OK: t.statusOK, WARN: t.statusWARN, FAULT: t.statusFAULT, OFFLINE: t.statusOFFLINE })[status]; }
 function healthClass(device) { if (!device.latest) return 'unknown'; if (device.latest.status === 'FAULT' || device.latest.status === 'OFFLINE' || device.activeAlertCount > 0) return 'critical'; if (device.latest.status === 'WARN' || device.latest.battery < 25 || device.latest.temperature > 40) return 'attention'; return 'healthy'; }
@@ -35,12 +34,21 @@ export function Dashboard({ token, user, language, t, onLanguageChange, onLogout
     token={token}
     language={language}
     t={t}
-    onClose={() =>
-      setSelectedDevice(null)
-    }
-    onUpdated={() =>
-      loadDashboard(true)
-    }
+    onClose={() => setSelectedDevice(null)}
+    onUpdated={() => loadDashboard(true)}
+  />
+)}
+
+{showAddDevice && (
+  <AddDeviceModal
+    token={token}
+    language={language}
+    t={t}
+    onClose={() => setShowAddDevice(false)}
+    onCreated={async () => {
+      await loadDashboard();
+      setShowAddDevice(false);
+    }}
   />
 )}</main>;
 }

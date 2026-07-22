@@ -51,8 +51,8 @@ export function DeviceDrawer({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingReading, setEditingReading] =
-    useState(false);
-
+    useState(null);
+const [addingReading, setAddingReading] = useState(false);
   const loadHistory = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -169,8 +169,7 @@ export function DeviceDrawer({
               <span>{t.location}</span>
 
               <strong className="location-value">
-                {latest.lat.toFixed(4)},{' '}
-                {latest.lng.toFixed(4)}
+               {Number(latest.lat).toFixed(4)},{' '} ,{Number(latest.lng).toFixed(4)}
               </strong>
             </article>
 

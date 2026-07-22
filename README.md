@@ -282,7 +282,6 @@ docker compose exec api npm test
 
 This submission does not include refresh tokens, email verification, per-device cryptographic credentials, WebSocket/SSE push, alert acknowledgement workflows, inventory CSV upload, audit logs, or observability dashboards. Next I would add device-scoped API keys or mutual TLS, a message queue between ingestion and persistence, cursor-based history pagination, Prometheus/OpenTelemetry instrumentation, structured audit events, browser end-to-end tests, and a real external inventory synchronization job. I would also separate migrations from container startup and manage them with a dedicated migration tool.
 
-
 ## Architecture
 
 ```text
@@ -298,16 +297,6 @@ MySQL 8.4                    Redis 7
 ```
 
 MySQL stores users, inventory, registered devices, telemetry, and alert state. Redis stores `latest:<deviceId>` values with a 30-second TTL and rate-limit counters. Nginx serves the React build and proxies `/api` to Express.
-
-## Project structure
-
-```text
-apps/api/       Express JavaScript API, services, validation, scripts, tests
-apps/web/       React JavaScript dashboard and translation files
-db/init.sql     MySQL schema and indexes
-docker-compose.yml
-sample_telemetry.json
-```
 
 All JavaScript/JSX source files begin with the required `// cypod-telemetry` marker. Deliberate task-only trade-offs include `// note:` comments. Commit subjects are prefixed with `[CYP-1183]`.
 
