@@ -1,0 +1,12 @@
+{
+  "name": "cypod-telemetry-js-mysql",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "docker compose up --build",
+    "down": "docker compose down",
+    "reset": "docker compose down -v",
+    "test": "npm --prefix apps/api test",
+    "seed:sample": "docker compose exec api node src/scripts/importSample.js /app/sample_telemetry.json"
+  }
+}

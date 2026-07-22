@@ -1,0 +1,80 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-telemetry}
+      MYSQL_USER: ${MYSQL_USER:-telemetry}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-telemetry}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root-telemetry}
+      TZ: UTC
+    command: ["--default-authentication-plugin=mysql_native_password", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root-telemetry}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ./apps/api
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-telemetry}
+      MYSQL_USER: ${MYSQL_USER:-telemetry}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-telemetry}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-development-secret-change-before-production}
+      JWT_EXPIRES_IN: 2h
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-30}
+      TEMP_CEILING: ${TEMP_CEILING:-45}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      AUTO_SEED_DEMO: ${AUTO_SEED_DEMO:-true}
+      DEMO_EMAIL: ${DEMO_EMAIL:-director.demo@cypod.local}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-DirectorDemo#2026}
+      SAMPLE_FILE_PATH: /app/sample_telemetry.json
+    volumes:
+      - ./sample_telemetry.json:/app/sample_telemetry.json:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 4s
+      retries: 12
+
+  web:
+    build: ./apps/web
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+
+volumes:
+  mysql_data:
+  redis_data:
